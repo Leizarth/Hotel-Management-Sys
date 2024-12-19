@@ -1,9 +1,8 @@
-### Hotel Maintenance System
+### Hotel Maintenance System ###
 
-#installing random library if not already installed
-!pip install random
 # importing random library
 import random
+
 
 # Defining the Appliance class
 class Appliance:
@@ -25,16 +24,16 @@ class Appliance:
         return f"{self.name}: {self.status}"
     
 
-# Defining the Room class
+
+    # Defining the Room class
 class Room:
     def __init__(self, room_number, occupied=False):
         # Initialize the room with a room number, occupancy status, status, and an empty list of appliances
-        
         self.room_number = room_number
         self.occupied = occupied
         self.status = "Usable"  # Default status is "Usable"
-        self.appliances = []
-        self.add_standard_appliances()
+        self.appliances = [] # Empty list of appliances
+        self.add_standard_appliances() # method to add standard appliances
 
     def add_standard_appliances(self):
         # Add appliances specific to a standard room
@@ -76,6 +75,8 @@ class Room:
         occupancy_status = "Occupied" if self.occupied else "Vacant"
         return f"Room {self.room_number} ({occupancy_status}, {self.status}) Appliances:\n    {appliance_status}"
 
+
+
 # Defining the Suite class (inherits from Room Class)
 class Suite(Room):
     def __init__(self, room_number, occupied=False):
@@ -89,14 +90,40 @@ class Suite(Room):
         self.add_appliance("Jacuzzi")
 
 
-# Define the MaintenanceOverviewSystem class
+
 class MaintenanceOverviewSystem:
     def __init__(self, rooms):
         # Initialize with a list of rooms
         self.rooms = rooms
+        self.fixed_appliances = 0 # Track the number of fixed appliances
+        self.unfixed_appliances = 0 # Track the number of unfixed appliances
+        self.fixed_rooms = []  # List of rooms with all appliances fixed
+        self.unfixed_rooms = []  # List of rooms where some appliances couldn't be fixed
+        self.skipped_rooms = []  # List of rooms skipped due to critical issues
+        self.out_of_order_rooms = []  # Rooms marked as Out of Order
+        self.out_of_service_rooms = []  # Rooms marked as Out of Service
+
+    def add_fixed_room(self, room):
+        # Add a room to the fixed list
+        if room.room_number not in self.fixed_rooms:
+            self.fixed_rooms.append(room.room_number)
+
+    def add_unfixed_room(self, room):
+        # Add a room to the unfixed list
+        if room.room_number not in self.unfixed_rooms:
+            self.unfixed_rooms.append(room.room_number)
+
+    def add_skipped_room(self, room, status):
+        # Add a room to the skipped list and track its status
+        if room.room_number not in self.skipped_rooms:
+            self.skipped_rooms.append(room.room_number)
+            if status == "Out of Order":
+                self.out_of_order_rooms.append(room.room_number)
+            elif status == "Out of Service":
+                self.out_of_service_rooms.append(room.room_number)
 
     def get_rooms_with_issues(self):
-        # Return a sorted list of rooms with broken appliances, prioritizing occupied rooms 
+        # Return a sorted list of rooms with broken appliances, prioritizing occupied rooms
         try:
             rooms_with_issues = [
                 {
@@ -106,12 +133,28 @@ class MaintenanceOverviewSystem:
                 }
                 for room in self.rooms if room.check_appliances()
             ]
-            # Sort by occupancy (occupied first) and then by room number (sorting algorithm)
+            # Sort by occupancy (occupied first) and then by room number
             sorted_rooms = sorted(rooms_with_issues, key=lambda x: (not x["occupied"], x["room_number"]))
             return sorted_rooms
         except Exception as e:
             print(f"Error retrieving rooms with issues: {e}")
             return []
+
+    def generate_report(self):
+        # Generate a detailed maintenance report
+        try:
+            print("\n--- Maintenance Report ---")
+            print(f"Fixed Appliances: {self.fixed_appliances}")
+            print(f"Unfixed Appliances: {self.unfixed_appliances}")
+            print(f"Fixed Rooms: {len(self.fixed_rooms)} ({', '.join(self.fixed_rooms)})\n")
+            print(f"Number of Unfixed Rooms left for tomorrow: {len(self.unfixed_rooms)} ({', '.join(self.unfixed_rooms)})")
+            print(f"Skipped Rooms: {len(self.skipped_rooms)} ({', '.join(self.skipped_rooms)})")
+            print(f"Out of Order Rooms: {len(self.out_of_order_rooms)} ({', '.join(self.out_of_order_rooms)})")
+            print(f"Out of Service Rooms: {len(self.out_of_service_rooms)} ({', '.join(self.out_of_service_rooms)})")
+            print(f"Remaining Rooms with Issues: {self.get_remaining_rooms_count()}")
+            print("--------------------------")
+        except Exception as e:
+            print(f"Error generating report: {e}")
 
     def get_remaining_rooms_count(self):
         # Return the count of rooms still needing maintenance
@@ -123,13 +166,11 @@ class MaintenanceOverviewSystem:
             return 0
 
 
-# Define the Maintenance class
+
 class Maintenance:
-    def __init__(self, location="Office"):
-        # Initialize with a starting location, defaulting to "Office"
+    def __init__(self, location="Maintenance's Office"):
+        # Initialize with a starting location, defaulting to "Maintenance's Office"
         self.location = location
-        self.fixed_appliances = 0
-        self.unfixed_appliances = 0
 
     def go_to_room(self, room_number):
         # Change the maintenance worker's location to the specified room
@@ -139,78 +180,67 @@ class Maintenance:
         except Exception as e:
             print(f"Error moving to room: {e}")
 
-    def fix_room(self, room):
-        # Fix all broken appliances in the specified room
+    def fix_room(self, room, overview_system):
         try:
-            if not room.check_appliances(): # If there is no broken appliances, then does nothing and return an error message
+            # Check if the room has already been skipped
+            if room.room_number in overview_system.skipped_rooms:
+                print(f"Skipping Room {room.room_number} as it was already attempted and not fixable.")
+                return
+
+            # Check for broken appliances
+            broken_appliances = room.check_appliances()
+            if not broken_appliances:
                 print(f"No issues found in Room {room.room_number}. Nothing to fix.")
                 return
-            for appliance in room.check_appliances():
-                if random.random() < 0.1:  # 10% chance the appliance cannot be fixed
-                    print(f"Could not fix {appliance.name} in Room {room.room_number}.")
-                    self.unfixed_appliances += 1 # If the appliance cannot be fixed, then it is added to the list of unfixed appliances
-                    if appliance.name in ["Air Conditioner", "Television"]: # If a critical appliance cannot be fixed, then the room is marked as "Out of Order"
-                        print(f" Marking room {room.room_number} as Out of Order.")
-                        room.status = "Out of Order" 
-                        print(f"Room {room.room_number} status is now changed to OOO.")
+
+            all_fixed = True  # Track if all appliances in the room were fixed
+            for appliance in broken_appliances:
+                if random.random() < 0.1:  # 10% chance the appliance cannot be fixed 
+                    print(f"Could not fix {appliance.name} in Room {room.room_number}.") 
+                    all_fixed = False # this is set to false if any appliance cannot be fixed
+                    overview_system.unfixed_appliances += 1 # increment the count of unfixed appliances
+                    
+                    # Check if the appliance is critical or non-critical 
+                    if appliance.name in ["Air Conditioner", "Television"]:  
+                        print(f"Marking Room {room.room_number} as Out of Order.") 
+                        room.status = "Out of Order" # Room cannot be used
+                        overview_system.add_skipped_room(room, "Out of Order")
                         return
-                    else: # If a non-critical appliance cannot be fixed,then it marks the room as Out of Service
-                        print(f"Marking room {room.room_number} as Out of Service.")
-                        room.status = "Out of Service"
-                        print(f"Room {room.room_number} status is now changed to Out of Service.")
-
+                    else:  # Non-critical appliances
+                        print(f"Marking Room {room.room_number} as Out of Service.")
+                        room.status = "Out of Service" # Room can be used with limitations
+                        overview_system.add_skipped_room(room, "Out of Service")
+                        return
                 else:
-                    appliance.mark_as_functional() # If the appliance can be fixed, then it is marked as functional
+                    appliance.mark_as_functional()  # Appliance fixed successfully
                     print(f"Fixed {appliance.name} in Room {room.room_number}.")
-            room.update_status()
+                    overview_system.fixed_appliances += 1 # increment the count of fixed appliances
+
+            if all_fixed: # checks if all appliances in the room were fixed
+                room.update_status()
+                overview_system.add_fixed_room(room)
+            else:
+                overview_system.add_unfixed_room(room)
         except Exception as e:
-            print(f"Error fixing room {room.room_number}: {e}") 
-
-    def determine_next_room(self, rooms_with_issues):
-        # Determine the next room to fix based on the sorted list of rooms with issues
-        try:
-            if not rooms_with_issues: # If there are no rooms with issues, then it returns "None"
-                print("No rooms with issues to fix.")
-                return None
-            next_room = rooms_with_issues[0]["room_number"] # The next room to fix will be the first room in the list
-            return next_room
-        except Exception as e:
-            print(f"Error determining next room: {e}")
-            return None
-
-    def log_location(self):
-        # Print the current location of the maintenance worker
-        try:
-            print(f"Maintenance is currently at {self.location}.")
-        except Exception as e:
-            print(f"Error logging location: {e}")
-
-    def generate_report(self):
-        # Generate a final report of the rooms and the appliances that couldn't be fixed
-        try:
-            print("\nStarting maintenance report.")
-            print(f"Could not fix {self.unfixed_appliances} appliances.") # Prints the number of appliances that couldn't be fixed
-            print("\nMaintenance report completed.")
-            self.fixed_appliances = 0 # Reset the count of fixed and unfixed appliances
-        except Exception as e:
-            print(f"Error generating report: {e}")
+            print(f"Error fixing Room {room.room_number}: {e}")
 
 
-# Main Logic
+
+#Main logic
 if __name__ == "__main__":
     # Step 1: Create rooms
     random.seed(42)  # Random seed used for reproducibility
-    rooms = [] # Empty list of rooms
-    for i in range(1, 201): # 200 rooms are created
-        room_number = f"{i:03}"  # the rooms have 3-digit numbers assigned to them
-        room_type = "standard" if i <= 140 else "suite" # these makes sure that there are 20 standard rooms and 10 suites
+    rooms = []  # Empty list of rooms
+    for i in range(1, 253):  # 253 rooms are created
+        room_number = f"{i:03}"  # The rooms have 3-digit numbers assigned to them
+        room_type = "standard" if i <= 20 else "suite"  # Ensures 20 standard rooms and 14 suites
         occupied = random.choice([True, False])  # Randomly assign occupancy
-        room = Room(room_number, occupied) if room_type == "standard" else Suite(room_number, occupied)
-        rooms.append(room) 
+        room = Room(room_number, occupied) if room_type == "standard" else Suite(room_number, occupied) # Create a room object based on type
+        rooms.append(room) # Add the room to the list
 
     print(f"Total rooms created: {len(rooms)}")
-    print(f" Total number of occupied rooms: {len([room for room in rooms if room.occupied])}")
-    print(f" Total number of vacant rooms: {len([room for room in rooms if not room.occupied])}")
+    print(f"Total number of occupied rooms: {len([room for room in rooms if room.occupied])}")
+    print(f"Total number of vacant rooms: {len([room for room in rooms if not room.occupied])}")
 
     # Step 2: Randomly break appliances
     broken_count = 0
@@ -229,21 +259,28 @@ if __name__ == "__main__":
     maintenance_worker = Maintenance()
 
     # Step 5: Maintenance workflow
+    print("\nStarting maintenance workflow.\n")
 
-    print("Starting maintenance workflow.\n")
     while True:
-        rooms_with_issues = overview_system.get_rooms_with_issues()
+        # Get rooms with issues, excluding skipped rooms
+        rooms_with_issues = [
+            room_info for room_info in overview_system.get_rooms_with_issues()
+            if room_info["room_number"] not in overview_system.skipped_rooms
+        ]
+
         if not rooms_with_issues:
+            print("No more rooms with unresolved issues. Ending workflow.")
             break
 
-        next_room_info = rooms_with_issues[0]  # Get highest priority room
+        # Goes to the next room with issues and fixes it based on the priority
+        next_room_info = rooms_with_issues[0]
         next_room = next((room for room in rooms if room.room_number == next_room_info["room_number"]), None)
-
+        
         if next_room:
             maintenance_worker.go_to_room(next_room.room_number)
-            maintenance_worker.fix_room(next_room)
+            maintenance_worker.fix_room(next_room, overview_system)
         else:
             print("Error: Room with issues not found in the system.")
 
     # Step 6: Generate the maintenance report
-    maintenance_worker.generate_report()
+    overview_system.generate_report()
